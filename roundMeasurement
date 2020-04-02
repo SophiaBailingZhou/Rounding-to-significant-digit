@@ -1,6 +1,6 @@
-Function tip(sigfig As Double, value As Double)
+Function roundMeasurement(Measurement As Double, error As Double)
     Dim s As String
-    s = CStr(value)
+    s = CStr(error)
     Dim counter As Integer
     Dim tmpInt As Integer
     Dim Btt As Boolean
@@ -9,21 +9,23 @@ Function tip(sigfig As Double, value As Double)
     dotPos = -1
     Dim counter2 As Integer
     
-    Dim sigplace As Integer
+    Dim resultStr As String
+    Dim tmpresult As String
+    Dim SpecificCase As String
+    Dim resultMeasurement As String
 
 
-
-    If value < 1 Then
+    If error < 1 Then                                                   'Weil ein Punkt in Strings genauso ein Zeichen sind wie Ziffern, hat Alex das so geschrieben, dass zwischen den Fällen mit 0.x und x.y unterschieden wird
 
         For counter = 3 To Len(s)
             Dim tmp
-            tmp = Mid(s, counter, 1)
-            tmpInt = Val(tmp)
+            tmp = Mid(s, counter, 1)                                    'Liest die Ziffer an Position counter aus
+            tmpInt = Val(tmp)                                           'Speichert die Ziffer an Position counter als Integer statt als String
 
             If tmpInt <> 0 Then
 
                 If tmpInt >= 3 Then
-                    Btt = True
+                    Btt = True                                          'Btt steht für bigger than three
                     Exit For
                 Else
                     Btt = False
@@ -36,11 +38,43 @@ Function tip(sigfig As Double, value As Double)
             Next
 
         If Btt Then
-            result = WorksheetFunction.RoundUp(value, counter - 2)
-            sigplace = counter - 2
-        Else
-            result = WorksheetFunction.RoundUp(value, counter - 1)
-            sigplace = counter - 1
+            If tmpInt = 9 Then                                          'Erste Nicht-Null-Ziffer ist 9
+                ninePos = InStr(1, s, "9")
+                 
+                If ninePos = 3 Then                                         ''Spezialfall 0.9X: Addiert noch 0 hinten dran, die durchs Runden verschwindet, aber eigentlich signifikant ist UND noch einen Punkt vor das Komma, weil sonst z.B. aus 0.9 10 wird lmao
+                    resultStr = "1.0"
+                    SpecificCase = "0.YY1"
+                    
+                Else
+                    nextToNinePosStr = Mid(s, ninePos + 1, 1)
+
+                    If nextToNinePosStr = "" Then                               '''Spezialfall 0.09
+                        result = WorksheetFunction.RoundUp(error, counter - 3)
+                        resultStr = CStr(result) & "0"
+                        SpecificCase = "0.YY2"
+    
+                    Else                                                        '''Spezialfall 0.09X
+                        result = WorksheetFunction.RoundUp(error, counter - 2)
+                        resultStr = CStr(result) & "0"
+                        SpecificCase = "0.YY3"
+                    End If
+                End If
+            Else                                                        'Fall Erste Nicht-Null-Ziffer ist 3-8
+                result = WorksheetFunction.RoundUp(error, counter - 2)
+                resultStr = CStr(result)
+                SpecificCase = "0.YN"
+            End If
+            
+        Else                                                            'Erste Nicht-Null-Ziffer ist 1 oder 2
+            If Mid(s, counter + 1, 1) = "9" Then                            ''Spezialfälle 0.19, 0.019 etc
+                result = WorksheetFunction.RoundUp(error, counter - 2)
+                resultStr = CStr(result) & "0"
+                SpecificCase = "0.NY"
+            Else                                                            ''Fall 0.1Y, 0.01Y etc mit Y = 0 bis 8
+                result = WorksheetFunction.RoundUp(error, counter - 1)
+                resultStr = CStr(result)
+                SpecificCase = "0.NN"
+            End If
         End If
 
 
@@ -48,21 +82,18 @@ Function tip(sigfig As Double, value As Double)
     Else
 
         dotPos = InStr(1, s, ".")
-        
         For counter = 1 To Len(s)
-        Dim tmp3
-
-        tmp3 = Mid(s, counter, 1)
-
-        tmpInt = Val(tmp3)
-        If tmpInt <> 0 Then
-
-            If tmpInt >= 3 Then
-                Btt = True
-                Exit For
-            Else
-                Btt = False
-                Exit For
+            Dim tmp3
+            tmp3 = Mid(s, counter, 1)
+            tmpInt = Val(tmp3)
+            
+            If tmpInt <> 0 Then
+                If tmpInt >= 3 Then
+                    Btt = True
+                    Exit For
+                Else
+                    Btt = False
+                    Exit For
             End If
         Else
 
@@ -72,29 +103,136 @@ Function tip(sigfig As Double, value As Double)
 
 
 
-        If dotPos > 0 Then
-            If Btt Then
-                result = WorksheetFunction.RoundUp(value, counter - dotPos + 1)
-                sigplace = counter - dotPos + 1
+        If dotPos > 0 Then                                              'Fall Zahl mit Nachkommastellen (z.B. 4.0)
+            If Btt Then                                                     ''Fall erste Nicht-Null-Ziffer >= 3
+                result = WorksheetFunction.RoundUp(error, counter - dotPos + 1)
+                resultStr = CStr(result)
+                SpecificCase = "1.YY"
             Else
-                result = WorksheetFunction.RoundUp(value, counter - dotPos + 2)
-                sigplace = counter - dotPos + 2
+                result = WorksheetFunction.RoundUp(error, counter - dotPos + 2)
+                If dotPos = 2 Then
+                    NextToDotPosStr = Mid(s, dotPos + 1, 1)
+                    TwoNextToDotPosStr = Mid(s, dotPos + 2, 1)
+                                        
+                    If NextToDotPosStr = "9" And TwoNextToDotPosStr <> "" Then '''Spezialfall 1.9X bzw 2.9X
+                        resultStr = CStr(result) & ".0"
+                        SpecificCase = "1.YN1"
+                    Else                                                       '''Fall 1.X_ (inkl. 1.9_)
+                        resultStr = CStr(result)
+                        SpecificCase = "1.YN2"
+                    End If
+                Else                                                           '''Fall 1X.X (also Rundungsstelle nicht direkt neben Komma)
+                    resultStr = CStr(result)
+                    SpecificCase = "1.YN3"
+                End If
             End If
-        Else
-            If Btt Then
-                result = WorksheetFunction.RoundUp(value, counter - Len(s))
-                sigplace = counter - Len(s)
+        Else                                                            'Fall Zahl ohne Nachkommastellen (z.B. 4)
+            If Btt Then                                                     ''Fall erste Nicht-Null-Ziffer >= 3
+                result = WorksheetFunction.RoundUp(error, counter - Len(s))
+                resultStr = CStr(result)
+                SpecificCase = "1.NY"
 
-            Else
-                result = WorksheetFunction.RoundUp(value, counter - Len(s) + 1)
-                sigplace = counter - Len(s) + 1
+            Else                                                            ''Fall erste Nicht-Null-Ziffer 1 oder 2
+                result = WorksheetFunction.RoundUp(error, counter - Len(s) + 1)
+                resultStr = CStr(result)
+                SpecificCase = "1.NN"
             End If
-    
+
         End If
-    
-    
+        
     End If
     
-    sigfig = WorksheetFunction.Round(sigfig, sigplace)
-    tip = sigfig
+'   Ab hier relevanter Teil für roundMeasurement, vor allem Anpassung der Anzahl der "trailing zeros"
+    Dim sigplace As Integer
+    
+    If SpecificCase = "0.YY1" Then
+        sigplace = counter - 2
+    End If
+    If SpecificCase = "0.YY2" Then
+        sigplace = counter - 2
+    End If
+    If SpecificCase = "0.YY3" Then
+        sigplace = counter - 2
+    End If
+    
+    If SpecificCase = "0.YN" Then
+        sigplace = counter - 2
+    End If
+    
+    If SpecificCase = "0.NY" Then
+        sigplace = counter - 2
+    End If
+    If SpecificCase = "0.NN" Then
+        sigplace = counter - 1
+    End If
+    
+    
+    
+    If SpecificCase = "1.YY" Then
+        sigplace = counter - dotPos + 1
+    End If
+    If SpecificCase = "1.YN1" Then
+        sigplace = counter - dotPos + 2
+    End If
+    If SpecificCase = "1.YN2" Then
+        sigplace = counter - dotPos + 2
+    End If
+    
+    If SpecificCase = "1.YN3" Then
+        sigplace = counter - dotPos + 2
+    End If
+    
+    If SpecificCase = "1.NY" Then
+        sigplace = counter - Len(s)
+    End If
+    If SpecificCase = "1.NN" Then
+        sigplace = counter - Len(s) + 1
+    End If
+    ' MsgBox (SpecificCase)
+    
+    PrelimMeasurement = WorksheetFunction.Round(Measurement, sigplace)
+    
+    
+    
+    dotPos_PrelimMeasurement = InStr(1, Abs(PrelimMeasurement), ".")
+    dotPos_Error = InStr(1, resultStr, ".")
+        ' MsgBox ("dotPos_PrelimMeasurement: " & dotPos_PrelimMeasurement)
+        ' MsgBox ("dotPos_Error: " & dotPos_Error)
+    
+    If dotPos_PrelimMeasurement = 0 Then
+        SubStr_PrelimMeasurement = "."
+    Else
+        SubStr_PrelimMeasurement = Mid(Abs(PrelimMeasurement), dotPos_PrelimMeasurement)
+    End If
+    ' MsgBox ("SubStr_PrelimMeasurement: " & SubStr_PrelimMeasurement)
+        
+    If dotPos_Error = 0 Then
+        SubStr_Error = "."
+    Else
+        SubStr_Error = Mid(resultStr, dotPos_Error)
+    End If
+    ' MsgBox ("SubStr_Error: " & SubStr_Error)
+        
+        
+        
+    charCounter_PrelimMeasurement = Len(SubStr_PrelimMeasurement)
+    charCounter_Error = Len(SubStr_Error)
+        ' MsgBox ("charCounter_PrelimMeasurement: " & charCounter_PrelimMeasurement)
+        ' MsgBox ("charCounter_Error: " & charCounter_Error)
+        
+    If charCounter_PrelimMeasurement < charCounter_Error Then
+        ' MsgBox ("jep")
+        If dotPos_PrelimMeasurement = 0 Then
+            resultMeasurement = CStr(PrelimMeasurement) & "." & WorksheetFunction.Rept(0, charCounter_Error - charCounter_PrelimMeasurement)
+        Else
+            resultMeasurement = CStr(PrelimMeasurement) & WorksheetFunction.Rept(0, charCounter_Error - charCounter_PrelimMeasurement)
+        End If
+    ElseIf charCounter_PrelimMeasurement > charCounter_Error Then
+        MsgBox ("Fehler: Messwert hat mehr Nachkommastellen als der Messfehler? Bin davon ausgegangen, dass das unmöglich sei.")
+    Else
+        resultMeasurement = CStr(PrelimMeasurement)
+    End If
+        
+    roundMeasurement = resultMeasurement
+    
 End Function
