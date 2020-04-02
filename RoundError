@@ -1,0 +1,92 @@
+Function rip(value As Double)
+    Dim s As String
+    s = CStr(value)
+    Dim counter As Integer
+    Dim tmpInt As Integer
+    Dim Btt As Boolean
+    Dim result As Double
+    Dim dotPos As Integer
+    dotPos = -1
+    Dim counter2 As Integer
+
+
+
+    If value < 1 Then
+
+        For counter = 3 To Len(s)
+            Dim tmp
+            tmp = Mid(s, counter, 1)
+            tmpInt = Val(tmp)
+
+            If tmpInt <> 0 Then
+
+                If tmpInt >= 3 Then
+                    Btt = True
+                    Exit For
+                Else
+                    Btt = False
+                    Exit For
+                End If
+            Else
+
+
+            End If
+            Next
+
+        If Btt Then
+            result = WorksheetFunction.RoundUp(value, counter - 2)
+        Else
+            result = WorksheetFunction.RoundUp(value, counter - 1)
+        End If
+
+
+
+    Else
+
+        dotPos = InStr(1, s, ".")
+
+        For counter = 1 To Len(s)
+        Dim tmp3
+
+        tmp3 = Mid(s, counter, 1)
+
+        tmpInt = Val(tmp3)
+        If tmpInt <> 0 Then
+
+            If tmpInt >= 3 Then
+                Btt = True
+                Exit For
+            Else
+                Btt = False
+                Exit For
+            End If
+        Else
+
+
+        End If
+        Next
+
+
+
+        If dotPos > 0 Then
+            If Btt Then
+                result = WorksheetFunction.RoundUp(value, counter - dotPos + 1)
+            Else
+                result = WorksheetFunction.RoundUp(value, counter - dotPos + 2)
+            End If
+        Else
+            If Btt Then
+                result = WorksheetFunction.RoundUp(value, counter - Len(s))
+
+            Else
+                result = WorksheetFunction.RoundUp(value, counter - Len(s) + 1)
+            End If
+
+        End If
+
+
+    End If
+
+
+    rip = result
+End Function
